@@ -1,4 +1,33 @@
 <h3>Home</h3>
-<% @users.each do |user| %>
-  <p>User: <%=link_to user.name, user %></p>
-<% end %>
+<div id="mapid"></div>
+
+<script>
+ var mymap = L.map('mapid').setView([51.505, -0.09], 13);
+  L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(mymap);
+  
+  var drawnItems = new L.FeatureGroup();
+  mymap.addLayer(drawnItems);
+
+  var editing = false;
+  mymap.on('click', function(e) {
+    if(!editing){ // do not start multiple "edit sessions"
+      editing = true;
+      var polyEdit = new L.Draw.Polygon(mymap);
+      polyEdit.enable();
+      polyEdit.addVertex(e.latlng);
+    }
+  });
+
+  mymap.on('draw:created', function (e) {
+    editing = false;
+    var type = e.layerType,
+        layer = e.layer;
+    var shape = layer.toGeoJSON()
+    var shape_for_db = JSON.stringify(shape);
+    drawnItems.addLayer(layer);
+  })
+</script>
+
+

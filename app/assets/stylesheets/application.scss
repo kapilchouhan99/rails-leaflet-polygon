@@ -12,7 +12,9 @@
  *= require_tree .
 */
 @import "bootstrap";
+@import "leaflet";
 
+#mapid { height: 500px; }
 html {
   font-size: 14px;
 }
