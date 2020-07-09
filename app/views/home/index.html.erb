@@ -1,26 +1,101 @@
-<h3>Home</h3>
+<div id="dialog-form" title="Create new user">
+  <div style="padding: 10px;">
+    <div style="display:inline; float:left;">
+      name: <input type="text" id="myTextBox" style="width: 210px;"/>      
+    </div>
+  </div>
+</div>
 <div id="mapid"></div>
 
-<script>
- var mymap = L.map('mapid').setView([51.505, -0.09], 13);
-  L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-  }).addTo(mymap);
+<h2>Polygons</h2>          
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Coordinates</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% if @polygons %>
+      <% @polygons.each do |p| %>
+        <tr>
+          <td><%= p.name %></td>
+          <td class="office" data-val="<%= p.geojson["geometry"]["coordinates"] if p.geojson %>" ><%= p.geojson["geometry"]["coordinates"] if p.geojson %></td>
+        </tr>
+      <% end %>
+    <% else %>
+      <p>No polygons are availble!!!</p>
+    <% end %>
+  </tbody>
+</table>
+
+
+<script src="https://code.jquery.com/jquery-1.11.1.min.js"></script>
+<script src="https://code.jquery.com/ui/1.11.1/jquery-ui.min.js"></script>
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.11.1/themes/smoothness/jquery-ui.css" />
+<script type="text/javascript">
+  var layer_data;
+
+  $("#dialog-form").dialog({
+    autoOpen  : false,
+    modal     : true,
+    title     : "Create Polygon",
+    buttons   : {
+                  'OK' : function() {
+                    var textValue = $('#myTextBox').val();
+
+                    layer_data.feature.properties.name = textValue;
+                    var shape = layer_data.toGeoJSON()
+                    var db_data = JSON.stringify(shape);
+                    console.log(db_data)
+    
+                    $.ajax({
+                      url:"/users/save_polygon",
+                      data: {jeojson: db_data},
+                      type:"POST",
+                      success:function(response)
+                      {
+                        console.log(response);
+                      }
+                    });
+                    //Now you have the value of the textbox, you can do something with it, maybe an AJAX call to your server!
+                    $('#myTextBox').val("");
+                    $(this).dialog('close');
+                  },
+                  'Close' : function() {
+                    $('#myTextBox').val("");
+                    $(this).dialog('close');
+                  }
+                }
+  });
+
+  var osmUrl = 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    osmAttrib = '&copy; <a href="http://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    osm = L.tileLayer(osmUrl, {
+        maxZoom: 18,
+        attribution: osmAttrib
+    });
   
+  map = L.map('mapid', {
+      layers: [osm],
+      center: [37.786617, -122.404654],
+      zoom: 15
+  });
+
   var drawnItems = new L.FeatureGroup();
-  mymap.addLayer(drawnItems);
+  map.addLayer(drawnItems);
 
   var editing = false;
-  mymap.on('click', function(e) {
+  map.on('click', function(e) {
     if(!editing){ // do not start multiple "edit sessions"
       editing = true;
-      var polyEdit = new L.Draw.Polygon(mymap);
+      var polyEdit = new L.Draw.Polygon(map);
       polyEdit.enable();
       polyEdit.addVertex(e.latlng);
     }
   });
 
-  mymap.on('draw:created', function (e) {
+  map.on('draw:created', function (e) {
     editing = false;
     var type = e.layerType,
         layer = e.layer;
@@ -28,6 +103,76 @@
     var shape_for_db = JSON.stringify(shape);
     drawnItems.addLayer(layer);
   })
+
+  <% if @polygons %>
+    <% @polygons.each do |p| %>
+      <% if p.geojson["geometry"]["type"] == "Polygon" %>
+        var coordinates = <%= p.geojson["geometry"]["coordinates"][0].map(&:reverse) %>
+        marker = L.polygon(coordinates).addTo(map); 
+      <% end %>     
+    <% end %>
+  <% end %>
+
+  map.on('draw:created', function (event) {
+    var layer = event.layer,
+      feature = layer.feature = layer.feature || {};
+    
+    feature.type = feature.type || "Feature";
+    var props = feature.properties = feature.properties || {};
+    //layer.feature = {properties: {}}; // No need to convert to GeoJSON.
+    //var props = layer.feature.properties;
+    props.name = null;
+    props.uid = Math.round(new Date().getTime() + (Math.random() * 100));;
+    drawnItems.addLayer(layer);
+    layer_data = layer
+    $("#dialog-form").dialog("open");
+  });
+  
+  
 </script>
-
-
+<style type="text/css">
+  .ui-dialog {
+  z-index: 9999 !important;
+  }
+  body {
+  font-size: 62.5%;
+  }
+  label, input {
+  display:inline;
+  }
+  input.text {
+  margin-bottom:12px;
+  width:95%;
+  padding: .4em;
+  }
+  fieldset {
+  padding:0;
+  border:0;
+  margin-top:25px;
+  }
+  h1 {
+  font-size: 1.2em;
+  margin: .6em 0;
+  }
+  div#users-contain {
+  width: 350px;
+  margin: 20px 0;
+  }
+  div#users-contain table {
+  margin: 1em 0;
+  border-collapse: collapse;
+  width: 100%;
+  }
+  div#users-contain table td, div#users-contain table th {
+  border: 1px solid #eee;
+  padding: .6em 10px;
+  text-align: left;
+  }
+  .ui-dialog .ui-state-error {
+  padding: .3em;
+  }
+  .valign {
+  border: 1px solid transparent;
+  padding: 0.3em;
+  }
+</style>
